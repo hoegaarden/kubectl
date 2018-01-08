@@ -67,11 +67,6 @@ func (s *APIServer) Start() error {
 		return err
 	}
 
-	err = s.Etcd.Start()
-	if err != nil {
-		return err
-	}
-
 	etcdURLString, err := s.Etcd.URL()
 	if err != nil {
 		if etcdStopErr := s.Etcd.Stop(); etcdStopErr != nil {
@@ -169,10 +164,6 @@ func (s *APIServer) Stop() error {
 		break
 	case <-timedOut:
 		return fmt.Errorf("timeout waiting for apiserver to stop")
-	}
-
-	if err := s.Etcd.Stop(); err != nil {
-		return err
 	}
 
 	if s.CertDir.Cleanup == nil {

@@ -95,7 +95,6 @@ func (e *Etcd) ensureInitialized() error {
 		if err != nil {
 			return err
 		}
-
 		e.Address = &url.URL{
 			Scheme: "http",
 			Host:   fmt.Sprintf("%s:%d", host, port),

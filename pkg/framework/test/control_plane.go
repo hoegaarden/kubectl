@@ -6,6 +6,7 @@ package test
 // Right now, that means Etcd and your APIServer. This is likely to increase in future.
 type ControlPlane struct {
 	APIServer ControlPlaneProcess
+	Etcd      ControlPlaneProcess
 }
 
 // ControlPlaneProcess knows how to start and stop a ControlPlane process.
@@ -21,19 +22,30 @@ type ControlPlaneProcess interface {
 
 // NewControlPlane will give you a ControlPlane struct that's properly wired together.
 func NewControlPlane() *ControlPlane {
+	etcd := &Etcd{}
+	apiServer := &APIServer{
+		Etcd: etcd,
+	}
 	return &ControlPlane{
-		APIServer: &APIServer{},
+		APIServer: apiServer,
+		Etcd:      etcd,
 	}
 }
 
 // Start will start your control plane. To stop it, call Stop().
 func (f *ControlPlane) Start() error {
+	if err := f.Etcd.Start(); err != nil {
+		return err
+	}
 	return f.APIServer.Start()
 }
 
 // Stop will stop your control plane, and clean up their data.
 func (f *ControlPlane) Stop() error {
-	return f.APIServer.Stop()
+	if err := f.APIServer.Stop(); err != nil {
+		return err
+	}
+	return f.Etcd.Stop()
 }
 
 // APIServerURL returns the URL to the APIServer. Clients can use this URL to connect to the APIServer.

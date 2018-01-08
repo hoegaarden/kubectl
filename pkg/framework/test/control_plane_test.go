@@ -14,12 +14,15 @@ var _ = Describe("ControlPlane", func() {
 	Context("with a properly configured set of ControlPlane", func() {
 		var (
 			fakeAPIServerProcess *testfakes.FakeControlPlaneProcess
+			fakeEtcdProcess      *testfakes.FakeControlPlaneProcess
 			controlPlane         ControlPlane
 		)
 		BeforeEach(func() {
 			fakeAPIServerProcess = &testfakes.FakeControlPlaneProcess{}
+			fakeEtcdProcess = &testfakes.FakeControlPlaneProcess{}
 			controlPlane = ControlPlane{
 				APIServer: fakeAPIServerProcess,
+				Etcd:      fakeEtcdProcess,
 			}
 		})
 
@@ -27,22 +30,42 @@ var _ = Describe("ControlPlane", func() {
 			err := controlPlane.Start()
 			Expect(err).NotTo(HaveOccurred())
 
+			By("starting Etcd")
+			Expect(fakeEtcdProcess.StartCallCount()).To(Equal(1),
+				"the Etcd process should be started exactly once")
 			By("starting APIServer")
 			Expect(fakeAPIServerProcess.StartCallCount()).To(Equal(1),
 				"the APIServer process should be started exactly once")
 		})
 
-		Context("when starting APIServer fails", func() {
+		Context("when starting Etcd fails", func() {
 			It("propagates the error", func() {
-				fakeAPIServerProcess.StartReturns(fmt.Errorf("another error"))
+				fakeEtcdProcess.StartReturns(fmt.Errorf("another error"))
 				err := controlPlane.Start()
 				Expect(err).To(MatchError(ContainSubstring("another error")))
 			})
 		})
 
+		Context("when starting APIServer fails", func() {
+			It("propagates the error", func() {
+				fakeAPIServerProcess.StartReturns(fmt.Errorf("yet ANOTHER error"))
+				err := controlPlane.Start()
+				Expect(err).To(MatchError(ContainSubstring("yet ANOTHER error")))
+			})
+		})
+
 		It("can can clean up the temporary directory and stop", func() {
 			controlPlane.Stop()
+			Expect(fakeEtcdProcess.StopCallCount()).To(Equal(1))
 			Expect(fakeAPIServerProcess.StopCallCount()).To(Equal(1))
+		})
+
+		Context("when stopping Etcd fails", func() {
+			It("propagates the error", func() {
+				fakeEtcdProcess.StopReturns(fmt.Errorf("error on etcd stop"))
+				err := controlPlane.Stop()
+				Expect(err).To(MatchError(ContainSubstring("error on etcd stop")))
+			})
 		})
 
 		Context("when stopping APIServer fails", func() {
