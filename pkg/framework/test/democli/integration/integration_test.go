@@ -24,7 +24,7 @@ var _ = Describe("DemoCLI Integration", func() {
 		apiURL, err := controlPlane.APIServerURL()
 		Expect(err).NotTo(HaveOccurred())
 
-		command := exec.Command(pathToDemoCommand, "listPods", "--api-url", apiURL)
+		command := exec.Command(pathToDemoCommand, "listPods", "--api-url", apiURL.String())
 		session, err := gexec.Start(command, GinkgoWriter, GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(session).Should(gexec.Exit(0))

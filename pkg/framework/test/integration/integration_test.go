@@ -22,22 +22,18 @@ var _ = Describe("The Testing Framework", func() {
 		err = controlPlane.Start()
 		Expect(err).NotTo(HaveOccurred(), "Expected controlPlane to start successfully")
 
-		var apiServerURL, etcdClientURL *url.URL
-		etcdUrlString, err := controlPlane.Etcd.URL()
+		var apiServerURL, etcdURL *url.URL
+		etcdURL, err = controlPlane.Etcd.URL()
 		Expect(err).NotTo(HaveOccurred())
-		etcdClientURL, err = url.Parse(etcdUrlString)
-		Expect(err).NotTo(HaveOccurred())
-		urlString, err := controlPlane.APIServerURL()
-		Expect(err).NotTo(HaveOccurred())
-		apiServerURL, err = url.Parse(urlString)
+		apiServerURL, err = controlPlane.APIServerURL()
 		Expect(err).NotTo(HaveOccurred())
 
-		isEtcdListeningForClients := isSomethingListeningOnPort(etcdClientURL.Host)
+		isEtcdListeningForClients := isSomethingListeningOnPort(etcdURL.Host)
 		isAPIServerListening := isSomethingListeningOnPort(apiServerURL.Host)
 
 		By("Ensuring Etcd is listening")
 		Expect(isEtcdListeningForClients()).To(BeTrue(),
-			fmt.Sprintf("Expected Etcd to listen for clients on %s,", etcdClientURL.Host))
+			fmt.Sprintf("Expected Etcd to listen for clients on %s,", etcdURL.Host))
 
 		By("Ensuring APIServer is listening")
 		Expect(isAPIServerListening()).To(BeTrue(),
