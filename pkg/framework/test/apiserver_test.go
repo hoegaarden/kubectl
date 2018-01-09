@@ -22,14 +22,12 @@ var _ = Describe("Apiserver", func() {
 	var (
 		fakeSession      *testfakes.FakeSimpleSession
 		apiServer        *APIServer
-		fakeEtcdProcess  *testfakes.FakeControlPlaneProcess
 		apiServerStopper chan struct{}
 		cleanupCallCount int
 	)
 
 	BeforeEach(func() {
 		fakeSession = &testfakes.FakeSimpleSession{}
-		fakeEtcdProcess = &testfakes.FakeControlPlaneProcess{}
 
 		apiServerStopper = make(chan struct{}, 1)
 		fakeSession.TerminateReturns(&gexec.Session{
@@ -47,7 +45,7 @@ var _ = Describe("Apiserver", func() {
 					return nil
 				},
 			},
-			Etcd:        fakeEtcdProcess,
+			EtcdAddress: &url.URL{Host: "the.etcd.url"},
 			StopTimeout: 500 * time.Millisecond,
 		}
 	})
@@ -59,12 +57,11 @@ var _ = Describe("Apiserver", func() {
 				fakeSession.ExitCodeReturnsOnCall(1, 143)
 
 				apiServer.Address = &url.URL{Scheme: "http", Host: "this.is.the.API.server:1234"}
-				fakeEtcdProcess.URLReturns("the etcd url", nil)
 
 				apiServer.ProcessStarter = func(command *exec.Cmd, out, err io.Writer) (SimpleSession, error) {
 					Expect(command.Args).To(ContainElement("--insecure-port=1234"))
 					Expect(command.Args).To(ContainElement("--insecure-bind-address=this.is.the.API.server"))
-					Expect(command.Args).To(ContainElement("--etcd-servers=the etcd url"))
+					Expect(command.Args).To(ContainElement("--etcd-servers=//the.etcd.url"))
 					Expect(command.Args).To(ContainElement("--cert-dir=/some/path/to/certdir"))
 					Expect(command.Path).To(Equal("/some/path/to/apiserver"))
 					fmt.Fprint(err, "Serving insecurely on this.is.the.API.server:1234")
@@ -74,9 +71,6 @@ var _ = Describe("Apiserver", func() {
 				By("Starting the API Server")
 				err := apiServer.Start()
 				Expect(err).NotTo(HaveOccurred())
-
-				By("...getting the URL of Etcd")
-				Expect(fakeEtcdProcess.URLCallCount()).To(Equal(1))
 
 				By("Stopping the API Server")
 				Expect(apiServer.Stop()).To(Succeed())
@@ -120,19 +114,17 @@ var _ = Describe("Apiserver", func() {
 			})
 		})
 
-		Context("when getting the URL of Etcd fails", func() {
-			It("propagates the error, stop Etcd and keep APIServer down", func() {
-				fakeEtcdProcess.URLReturns("", fmt.Errorf("no etcd url"))
-
+		Context("when EtcdAddress is not specified", func() {
+			It("propagates the error", func() {
+				apiServer.EtcdAddress = nil
 				apiServer.ProcessStarter = func(Command *exec.Cmd, out, err io.Writer) (SimpleSession, error) {
 					Expect(true).To(BeFalse(),
-						"the api server process starter shouldn't be called if getting etcd's URL fails")
+						"the api server process starter shouldn't be called if etcd's URL is nil")
 					return nil, nil
 				}
 
 				err := apiServer.Start()
-				Expect(err).To(MatchError(ContainSubstring("no etcd url")))
-				Expect(fakeEtcdProcess.StopCallCount()).To(Equal(1))
+				Expect(err).To(MatchError(ContainSubstring("Etcd URL cannot be empty")))
 			})
 		})
 
@@ -195,18 +187,6 @@ var _ = Describe("Apiserver", func() {
 			apiServerURL, err := apiServer.URL()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(apiServerURL).To(Equal("http://the.host.for.api.server:5678"))
-		})
-
-		Context("before starting the server", func() {
-			Context("and therefore the address has not been initialized", func() {
-				BeforeEach(func() {
-					apiServer = &APIServer{}
-				})
-				It("gives a sane error", func() {
-					_, err := apiServer.URL()
-					Expect(err).To(MatchError(ContainSubstring("not initialized")))
-				})
-			})
 		})
 	})
 })

@@ -173,16 +173,5 @@ var _ = Describe("Etcd", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(apiServerURL).To(Equal("http://the.host.for.etcd:6789"))
 		})
-		Context("before starting etcd", func() {
-			Context("and therefore the addressmanager has not been initialized", func() {
-				BeforeEach(func() {
-					etcd = &Etcd{}
-				})
-				It("gives a sane error", func() {
-					_, err := etcd.URL()
-					Expect(err).To(MatchError(ContainSubstring("not initialized")))
-				})
-			})
-		})
 	})
 })

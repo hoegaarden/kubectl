@@ -35,13 +35,6 @@ type APIServer struct {
 	// CertDir is a struct holding a path to a certificate directory and a function to cleanup that directory.
 	CertDir *CleanableDirectory
 
-	// Etcd is an implementation of a ControlPlaneProcess and is responsible to run Etcd and provide its coordinates.
-	// If not specified, a brand new instance of Etcd is brought up.
-	//
-	// You can customise this if, e.g. you wish to use a already existing and running Etcd.
-	// See the example `RemoteEtcd`.
-	Etcd ControlPlaneProcess
-
 	// StopTimeout, StartTimeout specify the time the APIServer is allowed to take when stopping resp. starting
 	// before and error is emitted.
 	StopTimeout  time.Duration
@@ -50,12 +43,15 @@ type APIServer struct {
 	session SimpleSession
 	stdOut  *gbytes.Buffer
 	stdErr  *gbytes.Buffer
+
+	// EtcdAddress points to an Etcd we can use to store APIServer's state
+	EtcdAddress *url.URL
 }
 
 // URL returns the URL APIServer is listening on. Clients can use this to connect to APIServer.
 func (s *APIServer) URL() (string, error) {
-	if s.Address == nil {
-		return "", fmt.Errorf("APIServer's Address is not initialized or configured")
+	if err := s.ensureInitialized(); err != nil {
+		return "", err
 	}
 	return s.Address.String(), nil
 }
@@ -67,14 +63,6 @@ func (s *APIServer) Start() error {
 		return err
 	}
 
-	etcdURLString, err := s.Etcd.URL()
-	if err != nil {
-		if etcdStopErr := s.Etcd.Stop(); etcdStopErr != nil {
-			return fmt.Errorf("%s, %s", err.Error(), etcdStopErr.Error())
-		}
-		return err
-	}
-
 	args := []string{
 		"--authorization-mode=Node,RBAC",
 		"--runtime-config=admissionregistration.k8s.io/v1alpha1",
@@ -83,7 +71,7 @@ func (s *APIServer) Start() error {
 		"--admission-control-config-file=",
 		"--bind-address=0.0.0.0",
 		"--storage-backend=etcd3",
-		fmt.Sprintf("--etcd-servers=%s", etcdURLString),
+		fmt.Sprintf("--etcd-servers=%s", s.EtcdAddress.String()),
 		fmt.Sprintf("--cert-dir=%s", s.CertDir.Path),
 		fmt.Sprintf("--insecure-port=%s", s.Address.Port()),
 		fmt.Sprintf("--insecure-bind-address=%s", s.Address.Hostname()),
@@ -133,8 +121,8 @@ func (s *APIServer) ensureInitialized() error {
 		}
 		s.CertDir = certDir
 	}
-	if s.Etcd == nil {
-		s.Etcd = &Etcd{}
+	if s.EtcdAddress == nil {
+		return fmt.Errorf("Etcd URL cannot be empty")
 	}
 	if s.StopTimeout == 0 {
 		s.StopTimeout = 20 * time.Second

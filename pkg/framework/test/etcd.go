@@ -1,12 +1,12 @@
 package test
 
 import (
-	"fmt"
 	"io"
 	"os/exec"
-	"time"
 
+	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
@@ -46,8 +46,8 @@ type SimpleSessionStarter func(command *exec.Cmd, out, err io.Writer) (SimpleSes
 
 // URL returns the URL Etcd is listening on. Clients can use this to connect to Etcd.
 func (e *Etcd) URL() (string, error) {
-	if e.Address == nil {
-		return "", fmt.Errorf("Etcd's Address not initialized or configured")
+	if err := e.ensureInitialized(); err != nil {
+		return "", err
 	}
 	return e.Address.String(), nil
 }

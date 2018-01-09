@@ -1,6 +1,10 @@
 // Package test an integration test framework for k8s
 package test
 
+import (
+	"net/url"
+)
+
 // ControlPlane is a struct that knows how to start your test control plane.
 //
 // Right now, that means Etcd and your APIServer. This is likely to increase in future.
@@ -23,8 +27,18 @@ type ControlPlaneProcess interface {
 // NewControlPlane will give you a ControlPlane struct that's properly wired together.
 func NewControlPlane() *ControlPlane {
 	etcd := &Etcd{}
+
+	etcdURL, err := etcd.URL()
+	if err != nil {
+		panic(err)
+	}
+	parsedEtcdURL, err := url.Parse(etcdURL)
+	if err != nil {
+		panic(err)
+	}
+
 	apiServer := &APIServer{
-		Etcd: etcd,
+		EtcdAddress: parsedEtcdURL,
 	}
 	return &ControlPlane{
 		APIServer: apiServer,
