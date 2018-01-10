@@ -2,126 +2,59 @@
 package testfakes
 
 import (
+	"net/url"
+	"os/exec"
 	"sync"
 
 	"k8s.io/kubectl/pkg/framework/test"
 )
 
 type FakeControlPlaneProcess struct {
-	StartStub        func() error
-	startMutex       sync.RWMutex
-	startArgsForCall []struct{}
-	startReturns     struct {
-		result1 error
-	}
-	startReturnsOnCall map[int]struct {
-		result1 error
-	}
-	StopStub        func() error
-	stopMutex       sync.RWMutex
-	stopArgsForCall []struct{}
-	stopReturns     struct {
-		result1 error
-	}
-	stopReturnsOnCall map[int]struct {
-		result1 error
-	}
-	URLStub        func() (string, error)
+	URLStub        func() (*url.URL, error)
 	uRLMutex       sync.RWMutex
 	uRLArgsForCall []struct{}
 	uRLReturns     struct {
-		result1 string
+		result1 *url.URL
 		result2 error
 	}
 	uRLReturnsOnCall map[int]struct {
-		result1 string
+		result1 *url.URL
 		result2 error
+	}
+	CommandStub        func() (*exec.Cmd, error)
+	commandMutex       sync.RWMutex
+	commandArgsForCall []struct{}
+	commandReturns     struct {
+		result1 *exec.Cmd
+		result2 error
+	}
+	commandReturnsOnCall map[int]struct {
+		result1 *exec.Cmd
+		result2 error
+	}
+	CleanUpStub        func() error
+	cleanUpMutex       sync.RWMutex
+	cleanUpArgsForCall []struct{}
+	cleanUpReturns     struct {
+		result1 error
+	}
+	cleanUpReturnsOnCall map[int]struct {
+		result1 error
+	}
+	UpMessageStub        func() string
+	upMessageMutex       sync.RWMutex
+	upMessageArgsForCall []struct{}
+	upMessageReturns     struct {
+		result1 string
+	}
+	upMessageReturnsOnCall map[int]struct {
+		result1 string
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeControlPlaneProcess) Start() error {
-	fake.startMutex.Lock()
-	ret, specificReturn := fake.startReturnsOnCall[len(fake.startArgsForCall)]
-	fake.startArgsForCall = append(fake.startArgsForCall, struct{}{})
-	fake.recordInvocation("Start", []interface{}{})
-	fake.startMutex.Unlock()
-	if fake.StartStub != nil {
-		return fake.StartStub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fake.startReturns.result1
-}
-
-func (fake *FakeControlPlaneProcess) StartCallCount() int {
-	fake.startMutex.RLock()
-	defer fake.startMutex.RUnlock()
-	return len(fake.startArgsForCall)
-}
-
-func (fake *FakeControlPlaneProcess) StartReturns(result1 error) {
-	fake.StartStub = nil
-	fake.startReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeControlPlaneProcess) StartReturnsOnCall(i int, result1 error) {
-	fake.StartStub = nil
-	if fake.startReturnsOnCall == nil {
-		fake.startReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.startReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeControlPlaneProcess) Stop() error {
-	fake.stopMutex.Lock()
-	ret, specificReturn := fake.stopReturnsOnCall[len(fake.stopArgsForCall)]
-	fake.stopArgsForCall = append(fake.stopArgsForCall, struct{}{})
-	fake.recordInvocation("Stop", []interface{}{})
-	fake.stopMutex.Unlock()
-	if fake.StopStub != nil {
-		return fake.StopStub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fake.stopReturns.result1
-}
-
-func (fake *FakeControlPlaneProcess) StopCallCount() int {
-	fake.stopMutex.RLock()
-	defer fake.stopMutex.RUnlock()
-	return len(fake.stopArgsForCall)
-}
-
-func (fake *FakeControlPlaneProcess) StopReturns(result1 error) {
-	fake.StopStub = nil
-	fake.stopReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeControlPlaneProcess) StopReturnsOnCall(i int, result1 error) {
-	fake.StopStub = nil
-	if fake.stopReturnsOnCall == nil {
-		fake.stopReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.stopReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeControlPlaneProcess) URL() (string, error) {
+func (fake *FakeControlPlaneProcess) URL() (*url.URL, error) {
 	fake.uRLMutex.Lock()
 	ret, specificReturn := fake.uRLReturnsOnCall[len(fake.uRLArgsForCall)]
 	fake.uRLArgsForCall = append(fake.uRLArgsForCall, struct{}{})
@@ -142,37 +75,162 @@ func (fake *FakeControlPlaneProcess) URLCallCount() int {
 	return len(fake.uRLArgsForCall)
 }
 
-func (fake *FakeControlPlaneProcess) URLReturns(result1 string, result2 error) {
+func (fake *FakeControlPlaneProcess) URLReturns(result1 *url.URL, result2 error) {
 	fake.URLStub = nil
 	fake.uRLReturns = struct {
-		result1 string
+		result1 *url.URL
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeControlPlaneProcess) URLReturnsOnCall(i int, result1 string, result2 error) {
+func (fake *FakeControlPlaneProcess) URLReturnsOnCall(i int, result1 *url.URL, result2 error) {
 	fake.URLStub = nil
 	if fake.uRLReturnsOnCall == nil {
 		fake.uRLReturnsOnCall = make(map[int]struct {
-			result1 string
+			result1 *url.URL
 			result2 error
 		})
 	}
 	fake.uRLReturnsOnCall[i] = struct {
-		result1 string
+		result1 *url.URL
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakeControlPlaneProcess) Command() (*exec.Cmd, error) {
+	fake.commandMutex.Lock()
+	ret, specificReturn := fake.commandReturnsOnCall[len(fake.commandArgsForCall)]
+	fake.commandArgsForCall = append(fake.commandArgsForCall, struct{}{})
+	fake.recordInvocation("Command", []interface{}{})
+	fake.commandMutex.Unlock()
+	if fake.CommandStub != nil {
+		return fake.CommandStub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fake.commandReturns.result1, fake.commandReturns.result2
+}
+
+func (fake *FakeControlPlaneProcess) CommandCallCount() int {
+	fake.commandMutex.RLock()
+	defer fake.commandMutex.RUnlock()
+	return len(fake.commandArgsForCall)
+}
+
+func (fake *FakeControlPlaneProcess) CommandReturns(result1 *exec.Cmd, result2 error) {
+	fake.CommandStub = nil
+	fake.commandReturns = struct {
+		result1 *exec.Cmd
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeControlPlaneProcess) CommandReturnsOnCall(i int, result1 *exec.Cmd, result2 error) {
+	fake.CommandStub = nil
+	if fake.commandReturnsOnCall == nil {
+		fake.commandReturnsOnCall = make(map[int]struct {
+			result1 *exec.Cmd
+			result2 error
+		})
+	}
+	fake.commandReturnsOnCall[i] = struct {
+		result1 *exec.Cmd
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeControlPlaneProcess) CleanUp() error {
+	fake.cleanUpMutex.Lock()
+	ret, specificReturn := fake.cleanUpReturnsOnCall[len(fake.cleanUpArgsForCall)]
+	fake.cleanUpArgsForCall = append(fake.cleanUpArgsForCall, struct{}{})
+	fake.recordInvocation("CleanUp", []interface{}{})
+	fake.cleanUpMutex.Unlock()
+	if fake.CleanUpStub != nil {
+		return fake.CleanUpStub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.cleanUpReturns.result1
+}
+
+func (fake *FakeControlPlaneProcess) CleanUpCallCount() int {
+	fake.cleanUpMutex.RLock()
+	defer fake.cleanUpMutex.RUnlock()
+	return len(fake.cleanUpArgsForCall)
+}
+
+func (fake *FakeControlPlaneProcess) CleanUpReturns(result1 error) {
+	fake.CleanUpStub = nil
+	fake.cleanUpReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeControlPlaneProcess) CleanUpReturnsOnCall(i int, result1 error) {
+	fake.CleanUpStub = nil
+	if fake.cleanUpReturnsOnCall == nil {
+		fake.cleanUpReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.cleanUpReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeControlPlaneProcess) UpMessage() string {
+	fake.upMessageMutex.Lock()
+	ret, specificReturn := fake.upMessageReturnsOnCall[len(fake.upMessageArgsForCall)]
+	fake.upMessageArgsForCall = append(fake.upMessageArgsForCall, struct{}{})
+	fake.recordInvocation("UpMessage", []interface{}{})
+	fake.upMessageMutex.Unlock()
+	if fake.UpMessageStub != nil {
+		return fake.UpMessageStub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.upMessageReturns.result1
+}
+
+func (fake *FakeControlPlaneProcess) UpMessageCallCount() int {
+	fake.upMessageMutex.RLock()
+	defer fake.upMessageMutex.RUnlock()
+	return len(fake.upMessageArgsForCall)
+}
+
+func (fake *FakeControlPlaneProcess) UpMessageReturns(result1 string) {
+	fake.UpMessageStub = nil
+	fake.upMessageReturns = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeControlPlaneProcess) UpMessageReturnsOnCall(i int, result1 string) {
+	fake.UpMessageStub = nil
+	if fake.upMessageReturnsOnCall == nil {
+		fake.upMessageReturnsOnCall = make(map[int]struct {
+			result1 string
+		})
+	}
+	fake.upMessageReturnsOnCall[i] = struct {
+		result1 string
+	}{result1}
 }
 
 func (fake *FakeControlPlaneProcess) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.startMutex.RLock()
-	defer fake.startMutex.RUnlock()
-	fake.stopMutex.RLock()
-	defer fake.stopMutex.RUnlock()
 	fake.uRLMutex.RLock()
 	defer fake.uRLMutex.RUnlock()
+	fake.commandMutex.RLock()
+	defer fake.commandMutex.RUnlock()
+	fake.cleanUpMutex.RLock()
+	defer fake.cleanUpMutex.RUnlock()
+	fake.upMessageMutex.RLock()
+	defer fake.upMessageMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

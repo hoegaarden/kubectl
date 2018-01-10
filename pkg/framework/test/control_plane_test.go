@@ -5,91 +5,89 @@ import (
 
 	"fmt"
 
+	"net/url"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubectl/pkg/framework/test/testfakes"
 )
 
 var _ = Describe("ControlPlane", func() {
-	Context("with a properly configured set of ControlPlane", func() {
+	Context("with a properly configured set of ControlPlaneProcesses", func() {
 		var (
 			fakeAPIServerProcess *testfakes.FakeControlPlaneProcess
 			fakeEtcdProcess      *testfakes.FakeControlPlaneProcess
+			fakeStarter          *testfakes.FakeProcessStarter
 			controlPlane         ControlPlane
 		)
 		BeforeEach(func() {
 			fakeAPIServerProcess = &testfakes.FakeControlPlaneProcess{}
 			fakeEtcdProcess = &testfakes.FakeControlPlaneProcess{}
+			fakeStarter = &testfakes.FakeProcessStarter{}
+
+			succesfulStopper := createStopper("")
+			fakeStarter.Returns(succesfulStopper, nil)
+
 			controlPlane = ControlPlane{
+				Starter:   fakeStarter.Spy,
 				APIServer: fakeAPIServerProcess,
 				Etcd:      fakeEtcdProcess,
 			}
 		})
 
-		It("can start them", func() {
-			err := controlPlane.Start()
-			Expect(err).NotTo(HaveOccurred())
-
-			By("starting Etcd")
-			Expect(fakeEtcdProcess.StartCallCount()).To(Equal(1),
-				"the Etcd process should be started exactly once")
-			By("starting APIServer")
-			Expect(fakeAPIServerProcess.StartCallCount()).To(Equal(1),
-				"the APIServer process should be started exactly once")
+		It("can start the ControlPlane", func() {
+			Expect(controlPlane.Start()).To(Succeed())
+			Expect(fakeStarter.CallCount()).To(Equal(2))
 		})
 
-		Context("when starting Etcd fails", func() {
+		It("does not panic when stopping the ControlPlane without starting it", func() {
+			Expect(controlPlane.Stop()).To(Succeed())
+			Expect(fakeStarter.CallCount()).To(Equal(0))
+		})
+
+		Context("when starting a ControlPlaneProcess fails", func() {
 			It("propagates the error", func() {
-				fakeEtcdProcess.StartReturns(fmt.Errorf("another error"))
+				fakeStarter.Returns(nil, fmt.Errorf("another error"))
 				err := controlPlane.Start()
 				Expect(err).To(MatchError(ContainSubstring("another error")))
 			})
 		})
 
-		Context("when starting APIServer fails", func() {
+		Context("when stopping a ControlPlaneProcess fails", func() {
 			It("propagates the error", func() {
-				fakeAPIServerProcess.StartReturns(fmt.Errorf("yet ANOTHER error"))
-				err := controlPlane.Start()
-				Expect(err).To(MatchError(ContainSubstring("yet ANOTHER error")))
-			})
-		})
+				failingStopper := createStopper("error on stop")
+				fakeStarter.Returns(failingStopper, nil)
 
-		It("can can clean up the temporary directory and stop", func() {
-			controlPlane.Stop()
-			Expect(fakeEtcdProcess.StopCallCount()).To(Equal(1))
-			Expect(fakeAPIServerProcess.StopCallCount()).To(Equal(1))
-		})
-
-		Context("when stopping Etcd fails", func() {
-			It("propagates the error", func() {
-				fakeEtcdProcess.StopReturns(fmt.Errorf("error on etcd stop"))
-				err := controlPlane.Stop()
-				Expect(err).To(MatchError(ContainSubstring("error on etcd stop")))
-			})
-		})
-
-		Context("when stopping APIServer fails", func() {
-			It("propagates the error", func() {
-				fakeAPIServerProcess.StopReturns(fmt.Errorf("error on stop"))
+				Expect(controlPlane.Start()).To(Succeed())
 				err := controlPlane.Stop()
 				Expect(err).To(MatchError(ContainSubstring("error on stop")))
 			})
 		})
 
 		It("can be queried for the APIServer URL", func() {
-			fakeAPIServerProcess.URLReturns("some url to the apiserver", nil)
+			fakeAPIServerProcess.URLReturns(&url.URL{Host: "some.url.to.the.apiserver"}, nil)
 
 			url, err := controlPlane.APIServerURL()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(Equal("some url to the apiserver"))
+			Expect(url.String()).To(Equal("//some.url.to.the.apiserver"))
 		})
 
 		Context("when querying the URL fails", func() {
 			It("propagates the error", func() {
-				fakeAPIServerProcess.URLReturns("", fmt.Errorf("URL error"))
+				fakeAPIServerProcess.URLReturns(nil, fmt.Errorf("URL error"))
 				_, err := controlPlane.APIServerURL()
 				Expect(err).To(MatchError(ContainSubstring("URL error")))
 			})
 		})
 	})
 })
+
+func createStopper(errorMessage string) func() error {
+	var err error
+	if errorMessage != "" {
+		err = fmt.Errorf(errorMessage)
+	}
+	return func() error {
+		return err
+	}
+}

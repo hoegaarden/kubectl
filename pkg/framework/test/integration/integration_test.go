@@ -16,7 +16,8 @@ var _ = Describe("The Testing Framework", func() {
 	It("Successfully manages the control plane lifecycle", func() {
 		var err error
 
-		controlPlane := &test.ControlPlane{}
+		controlPlane, err := test.NewControlPlane()
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Starting all the control plane processes")
 		err = controlPlane.Start()
@@ -52,7 +53,7 @@ var _ = Describe("The Testing Framework", func() {
 
 	Measure("It should be fast to bring up and tear down the control plane", func(b Benchmarker) {
 		b.Time("lifecycle", func() {
-			controlPlane := &test.ControlPlane{}
+			controlPlane, _ := test.NewControlPlane()
 
 			controlPlane.Start()
 			controlPlane.Stop()
