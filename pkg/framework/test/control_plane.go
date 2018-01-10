@@ -15,14 +15,11 @@ import (
 //
 // Right now, that means Etcd and your APIServer. This is likely to increase in future.
 type ControlPlane struct {
-	APIServer ProcessManager
-	Etcd      ProcessManager
-}
+	APIServer ControlPlaneProcess
+	Etcd      ControlPlaneProcess
 
-type ProcessManager interface {
-	Start() error
-	Stop() error
-	URL() (*url.URL, error)
+	apiServerSession SimpleSession
+	etcdSession      SimpleSession
 }
 
 type ControlPlaneProcess interface {
@@ -34,53 +31,60 @@ type ControlPlaneProcess interface {
 
 //go:generate counterfeiter . ControlPlaneProcess
 
-type process struct {
-	Implementation ControlPlaneProcess
-
-	session      *gexec.Session // SimpleSession
-	stdErr       *gbytes.Buffer
-	stdOut       *gbytes.Buffer
-	startTimeout time.Duration
-	stopTimeout  time.Duration
+type SimpleSession interface {
+	Terminate() *gexec.Session
 }
 
 // NewControlPlane will give you a ControlPlane struct that's properly wired together.
 func NewControlPlane() *ControlPlane {
-	etcdProc := &process{
-		Implementation: &Etcd{},
-	}
-
-	etcdURL, err := etcdProc.Implementation.URL()
-	if err != nil {
-		panic(err) // TODO me no like panic ...
-	}
-
-	apiServerProc := &process{
-		Implementation: &APIServer{
-			EtcdAddress: etcdURL,
-		},
-	}
-
 	return &ControlPlane{
-		APIServer: apiServerProc,
-		Etcd:      etcdProc,
+		Etcd:      &Etcd{},
+		APIServer: &APIServer{},
 	}
 }
 
-// Start will start your control plane. To stop it, call Stop().
 func (f *ControlPlane) Start() error {
-	if err := f.Etcd.Start(); err != nil {
+	var err error
+
+	f.etcdSession, err = startProcess(f.Etcd)
+	if err != nil {
 		return err
 	}
-	return f.APIServer.Start()
+
+	etcdUrl, err := f.Etcd.URL()
+	if err != nil {
+		return err
+	}
+
+	// TODO ~!@#$%^
+	if f.APIServer.(*APIServer).EtcdAddress == nil {
+		f.APIServer.(*APIServer).EtcdAddress = etcdUrl
+	}
+
+	f.apiServerSession, err = startProcess(f.APIServer)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// Stop will stop your control plane, and clean up their data.
 func (f *ControlPlane) Stop() error {
-	if err := f.APIServer.Stop(); err != nil {
+	if err := stopProcess(f.apiServerSession); err != nil {
 		return err
 	}
-	return f.Etcd.Stop()
+	if err := f.APIServer.CleanUp(); err != nil {
+		return err
+	}
+
+	if err := stopProcess(f.etcdSession); err != nil {
+		return err
+	}
+	if err := f.Etcd.CleanUp(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // APIServerURL returns the URL to the APIServer. Clients can use this URL to connect to the APIServer.
@@ -88,68 +92,42 @@ func (f *ControlPlane) APIServerURL() (*url.URL, error) {
 	return f.APIServer.URL()
 }
 
-func (pm *process) ensureInitialized() {
-	if pm.stdErr == nil {
-		pm.stdErr = gbytes.NewBuffer()
-	}
-	if pm.stdOut == nil {
-		pm.stdOut = gbytes.NewBuffer()
-	}
-
-	if pm.startTimeout == 0 {
-		pm.startTimeout = 20 * time.Second
-	}
-	if pm.stopTimeout == 0 {
-		pm.stopTimeout = 20 * time.Second
-	}
-}
-
-func (pm *process) Start() error {
-	pm.ensureInitialized()
-
-	command, err := pm.Implementation.Command()
+func startProcess(p ControlPlaneProcess) (SimpleSession, error) {
+	command, err := p.Command()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	detectedStart := pm.stdErr.Detect(fmt.Sprintf(pm.Implementation.UpMessage()))
-	timedOut := time.After(pm.startTimeout)
+	stdErr := gbytes.NewBuffer()
 
-	pm.session, err = gexec.Start(command, pm.stdOut, pm.stdErr)
+	detectedStart := stdErr.Detect(p.UpMessage())
+	timedOut := time.After(20 * time.Second)
+
+	session, err := gexec.Start(command, nil, stdErr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	select {
 	case <-detectedStart:
-		return nil
+		return session, nil
 	case <-timedOut:
-		return fmt.Errorf("timeout waiting for etcd to start serving")
+		return nil, fmt.Errorf("timeout waiting for XXX to start serving")
 	}
 }
 
-func (pm *process) Stop() error {
-	if pm.session == nil {
+func stopProcess(session SimpleSession) error {
+	if session == nil {
 		return nil
 	}
 
-	session := pm.session.Terminate()
-	detectedStop := session.Exited
-	timedOut := time.After(pm.stopTimeout)
+	detectedStop := session.Terminate().Exited
+	timedOut := time.After(20 * time.Second)
 
 	select {
 	case <-detectedStop:
-		break
+		return nil
 	case <-timedOut:
 		return fmt.Errorf("timeout waiting for XXX to stop")
 	}
-
-	if pm.Implementation.CleanUp == nil {
-		return nil
-	}
-	return pm.Implementation.CleanUp()
-}
-
-func (pm *process) URL() (*url.URL, error) {
-	return pm.Implementation.URL()
 }
