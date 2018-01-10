@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"path"
 	"time"
 
 	"github.com/onsi/gomega/gbytes"
@@ -18,9 +19,11 @@ type ControlPlane struct {
 	APIServer ControlPlaneProcess
 	Etcd      ControlPlaneProcess
 
-	apiServerSession SimpleSession
-	etcdSession      SimpleSession
+	apiServerStopper Stopper
+	etcdStopper      Stopper
 }
+
+type Stopper func() error
 
 type ControlPlaneProcess interface {
 	URL() (*url.URL, error)
@@ -31,22 +34,12 @@ type ControlPlaneProcess interface {
 
 //go:generate counterfeiter . ControlPlaneProcess
 
-type SimpleSession interface {
-	Terminate() *gexec.Session
-}
-
-// NewControlPlane will give you a ControlPlane struct that's properly wired together.
-func NewControlPlane() *ControlPlane {
-	return &ControlPlane{
-		Etcd:      &Etcd{},
-		APIServer: &APIServer{},
-	}
-}
-
 func (f *ControlPlane) Start() error {
+	f.ensureInitialized()
+
 	var err error
 
-	f.etcdSession, err = startProcess(f.Etcd)
+	f.etcdStopper, err = startProcess(f.Etcd)
 	if err != nil {
 		return err
 	}
@@ -61,7 +54,7 @@ func (f *ControlPlane) Start() error {
 		f.APIServer.(*APIServer).EtcdAddress = etcdUrl
 	}
 
-	f.apiServerSession, err = startProcess(f.APIServer)
+	f.apiServerStopper, err = startProcess(f.APIServer)
 	if err != nil {
 		return err
 	}
@@ -70,20 +63,12 @@ func (f *ControlPlane) Start() error {
 }
 
 func (f *ControlPlane) Stop() error {
-	if err := stopProcess(f.apiServerSession); err != nil {
+	if err := f.apiServerStopper(); err != nil {
 		return err
 	}
-	if err := f.APIServer.CleanUp(); err != nil {
+	if err := f.etcdStopper(); err != nil {
 		return err
 	}
-
-	if err := stopProcess(f.etcdSession); err != nil {
-		return err
-	}
-	if err := f.Etcd.CleanUp(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -92,14 +77,22 @@ func (f *ControlPlane) APIServerURL() (*url.URL, error) {
 	return f.APIServer.URL()
 }
 
-func startProcess(p ControlPlaneProcess) (SimpleSession, error) {
+func (f *ControlPlane) ensureInitialized() {
+	if f.Etcd == nil {
+		f.Etcd = &Etcd{}
+	}
+	if f.APIServer == nil {
+		f.APIServer = &APIServer{}
+	}
+}
+
+func startProcess(p ControlPlaneProcess) (Stopper, error) {
 	command, err := p.Command()
 	if err != nil {
 		return nil, err
 	}
 
 	stdErr := gbytes.NewBuffer()
-
 	detectedStart := stdErr.Detect(p.UpMessage())
 	timedOut := time.After(20 * time.Second)
 
@@ -108,26 +101,36 @@ func startProcess(p ControlPlaneProcess) (SimpleSession, error) {
 		return nil, err
 	}
 
+	binName := getBinName(command)
+	stopper := func() error {
+		if session == nil {
+			return nil
+		}
+
+		detectedStop := session.Terminate().Exited
+		timedOut := time.After(20 * time.Second)
+
+		select {
+		case <-detectedStop:
+			return p.CleanUp()
+		case <-timedOut:
+			return fmt.Errorf("timeout waiting for %s to stop", binName)
+		}
+	}
+
 	select {
 	case <-detectedStart:
-		return session, nil
+		return stopper, nil
 	case <-timedOut:
-		return nil, fmt.Errorf("timeout waiting for XXX to start serving")
+		return nil, fmt.Errorf("timeout waiting for %s to start serving", binName)
 	}
 }
 
-func stopProcess(session SimpleSession) error {
-	if session == nil {
-		return nil
+// getBinName is just a helper to extract a nice name from a *exec.Command
+func getBinName(cmd *exec.Cmd) string {
+	name := path.Base(cmd.Path)
+	if name == "." || name == "/" {
+		name = "<unknown>"
 	}
-
-	detectedStop := session.Terminate().Exited
-	timedOut := time.After(20 * time.Second)
-
-	select {
-	case <-detectedStop:
-		return nil
-	case <-timedOut:
-		return fmt.Errorf("timeout waiting for XXX to stop")
-	}
+	return name
 }

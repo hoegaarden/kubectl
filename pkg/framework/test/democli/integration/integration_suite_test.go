@@ -25,7 +25,7 @@ var _ = BeforeSuite(func() {
 	pathToDemoCommand, err = gexec.Build("k8s.io/kubectl/pkg/framework/test/democli/")
 	Expect(err).NotTo(HaveOccurred())
 
-	controlPlane = test.NewControlPlane()
+	controlPlane = &test.ControlPlane{} // test.NewControlPlane()
 	Expect(err).NotTo(HaveOccurred())
 
 	err = controlPlane.Start()
