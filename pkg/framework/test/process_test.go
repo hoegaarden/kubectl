@@ -48,6 +48,12 @@ var _ = Describe("StartProcess", func() {
 			Expect(stopper).To(BeNil())
 		})
 	})
+
+	// When the process terminates right away
+	// When the process runs into a timeout while starting
+	// When the process runs into a timeout while stopping
+	// When CleanUp is nil / is not nil
+	// When UpMessage is "" / not ""
 })
 
 func getTestCommand() *exec.Cmd {
